@@ -12,12 +12,22 @@ To use:
 Each query will be executed and the results posted to sumo as a log event. Each result row will be posted in log event as a json formatted array.
 
 ## parsing the results in sumo
+**recommended**
+- create a field extraction rule in sumologic to parse the basic event fields from your database qury results with this parse logic:
+```
+parse "RESULTS: name=* db=* server=* results= *" as name,db,server,results nodrop
+```
+
+
+The results element is a json formatted array of results.
+
+### queries with one result row
 If there is ONE result row (say with the sql properties query). We could parse it like using a single row per event method.
 
 for example for this query:
 ```
 _source=db_*  _sourcecategory=*db* results "SQL Properties"
-// note this next line not required for events > 9:45 am 12 dec AEDT
+// you might have this line as an FER in which case not required
 | parse "RESULTS: name=* db=* server=* results= *" as name,db,server,results nodrop
 | where name = "SQL Properties"
 ```
@@ -37,7 +47,7 @@ c) the fastest query to run. we just parse the _raw field like this:
 ```
 | parse "\"db_suspect\":*,\"db_restoring\":*,\"db_online\":*,\"cpu_count\":*,\"hardware_type\":\"*\",\"db_recoveryPending\":*,\"server_memory\":*,\"db_recovering\":0,\"measurement\":\"*\",\"sku\":\"*\",\"database_name\":\"*\",\"engine_edition\":*,\"sql_version\":\"*\",\"uptime\":*,\"sql_instance\":\"*\",\"db_offline\":*}" as db_suspect,db_restoring,db_online,cpu_count,hardware_type,db_recoveryPending,server_memory,sqlserver_server_properties,sku,database_name,engine_edition,sql_version,uptime,sql_instance,db_offline
 ```
-
+### queries with 1..many result rows
 If there are MORE THAN ONE result rows possible we must use parse regex multi to create one new event per result row.
 
 ```
@@ -48,4 +58,9 @@ If there are MORE THAN ONE result rows possible we must use parse regex multi to
 | timeslice by 1m
 | count by _timeslice,tablename,used_mb,total_mb,total_gb,unused_mb,schemaname,rowcounts | fields -_count
 | used_mb + unused_mb as total_mb
+```
+
+## Example of a script source JSON
+```
+{  "name":"db_standard_info", "category":"aws/prod/db/sqlserver", "description":"mssql queries script source", "charsetName":"UTF-8", "timestampParsing":true, "timestampFormats":[], "multiLineProcessing":true, "forceTimeZone":false, "filters":[], "cutoffTimestamp":0, "fields":{ }, "dryRunMode":false, "script":null, "cronExpression":"0 0 0 * * ?", "timeout":0, "workingDir":"", "commands":["powershell","-NoLogo","-NonInteractive","-ExecutionPolicy","RemoteSigned","-WindowStyle","Hidden","-File"], "scriptFile":"C:\\Program Files\\Sumo Logic Collector\\sql_query_sumo_logic.ps1", "extension":"ps1", "sourceType":"Script" }
 ```
