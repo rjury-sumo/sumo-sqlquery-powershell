@@ -50,6 +50,15 @@ c) the fastest query to run. we just parse the _raw field like this:
 ### queries with 1..many result rows
 If there are MORE THAN ONE result rows possible we must use parse regex multi to create one new event per result row.
 
+## one approach - parse into row json objects
+We can parse multi to get one row event for each result row like this:
+```
+| parse regex field=results "[\[,](?<row>\{\".*?[\d\"]\})[,$]" multi
+| json auto field=row
+```
+
+## another approach - parse regex multi each row directly
+We can also do it this way this is trickier to write the expression as text columns have "" and numeric ones do not.
 ```
 (_source=db_*  _sourcecategory=*db* results) "Table size"
 | parse "RESULTS: name=* db=* server=* results= *" as name,db,server,results nodrop
