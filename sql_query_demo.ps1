@@ -1,5 +1,7 @@
 param (
-    [Parameter(Mandatory = $false)] $query_file = './queries.ps1'
+    [Parameter(Mandatory = $false)] $query_file = './queries.ps1',
+    [Parameter(Mandatory = $false)] $output_line_per = 'query'
+
 )
 
 $scriptDir = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
@@ -35,11 +37,9 @@ function sql {
         $results += new-object psobject -property $row            
     }
     $connection.Close();
-    if( $results.count -gt 0) {
-        return $results
-    } else {
-        return @()
-    }
+
+    , $results
+
 }
 
 function tolog {
@@ -65,15 +65,26 @@ $queries = @()
 . "$scriptDir\$query_file"
 
 tolog -level "info" -event "starting script: $($queries.count) to run from $query_file"
+$n = 0
 
 foreach ( $query in $queries) {
-    tolog -level "debug" -event "executing query job: $($query.name)"
+    $n +=1
+    tolog -level "debug" -event "executing query job: $($query.name) on $query.server"
     # remove line breaks from query
     $q = ($query.query -replace "--.+"," ") -replace "`n"," "
 
     try {
         $data = sql -sqlText $q -database $query.database -server $query.server
-        tolog -level 'info' -event "RESULTS: name=$($query.name) db=$($query.database) server=$($query.server) results= { `"results`": $($data | convertto-json -Compress ) }"
+        tolog -level "info" -event "query $($n): $($query.name) on $($query.server) $($data.count) rows."
+        if ($output_line_per -eq 'query') {
+            tolog -level 'info' -event "RESULTS: name=$($query.name) db=$($query.database) server=$($query.server) results= { `"results`": $($data | convertto-json -Compress ) }"
+        } else {
+            $i = 0
+            foreach ($row in $data) {
+                $i +=1
+                tolog -level 'info' -event "RESULTS: name=$($query.name) db=$($query.database) server=$($query.server) row=$i/$($data.count) { `"row`": $($row | convertto-json -Compress ) }"
+            }
+        }
      
     }
     catch {
